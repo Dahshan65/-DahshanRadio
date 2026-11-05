@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2a1a12">
+<title>محطة دهشان الإذاعية ترحب بكم</title>
+<meta name="description" content="استمع إلى الإذاعات الأردنية والعربية عبر الإنترنت">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="محطة دهشان">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&family=Reem+Kufi:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --wood:#2a1a12;
+  --wood-2:#3a2418;
+  --wood-3:#4c3122;
+  --ivory:#f4e8cf;
+  --ivory-dim:#c9b797;
+  --amber:#f4c566;
+  --amber-deep:#c98a2c;
+  --red:#d3202f;
+  --brass:#b8935a;
+  --ink:#24140b;
+  --px-per-mhz:96px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:var(--wood)}
+body{
+  color:var(--ivory);
+  font-family:"Noto Naskh Arabic","Tahoma",serif;
+  font-size:17px;line-height:1.6;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+button,input{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.app{max-width:560px;margin:0 auto;padding:14px 16px 24px}
+
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.brand h1{margin:0;font-family:"Noto Naskh Arabic","Traditional Arabic","Tahoma",serif;font-size:clamp(19px,5.6vw,25px);line-height:1.3;text-wrap:balance;font-weight:700;letter-spacing:0}
+.grille{
+  flex:1;min-width:0;height:22px;opacity:.65;
+  background-image:radial-gradient(circle at 3px 3px,#120a06 2px,transparent 2.4px);
+  background-size:9px 7.5px;
+}
+
+/* الواجهة المضيئة */
+.panel{
+  border-radius:14px 14px 6px 6px;
+  background:radial-gradient(120% 130% at 50% 0,#ffdf97 0,var(--amber) 45%,var(--amber-deep) 100%);
+  color:var(--ink);
+  box-shadow:inset 0 0 0 2px #7d5526,inset 0 -18px 24px -18px #7d4f16;
+  overflow:hidden;
+  transition:filter .25s;
+}
+body:not(.on) .panel{filter:brightness(.56) saturate(.72)}
+.readout{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;padding:14px 16px 8px;min-height:92px}
+.freq{
+  font-family:"Reem Kufi",sans-serif;font-weight:700;font-size:46px;line-height:1;
+  direction:ltr;font-variant-numeric:tabular-nums;min-width:112px;text-align:center;
+}
+.freq small{display:block;font-size:13px;font-weight:500;margin-top:5px}
+.now{min-width:0}
+.now strong{display:block;font-family:"Reem Kufi",serif;font-size:21px;font-weight:700;line-height:1.3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.now span{display:block;font-size:15px;line-height:1.4;color:#4a2c13}
+
+.dial{
+  position:relative;height:86px;direction:ltr;overflow:hidden;touch-action:none;cursor:grab;
+  border-top:1px solid #8b602b77;user-select:none;-webkit-user-select:none;
+}
+.dial:active{cursor:grabbing}
+.scale{
+  position:absolute;top:0;left:50%;height:100%;
+  width:calc(20.5 * var(--px-per-mhz));
+  background-image:
+    linear-gradient(90deg,#3e2410 2px,transparent 2px),
+    linear-gradient(90deg,#3e241099 1px,transparent 1px);
+  background-size:var(--px-per-mhz) 18px,calc(var(--px-per-mhz) / 5) 9px;
+  background-position:calc(var(--px-per-mhz) / 2 - 1px) 100%,calc(var(--px-per-mhz) / 2) 100%;
+  background-repeat:repeat-x;
+  will-change:transform;
+}
+.scale.snap{transition:transform .22s ease-out}
+.tick-num{
+  position:absolute;bottom:20px;transform:translateX(-50%);
+  font-family:"Reem Kufi",sans-serif;font-size:15px;font-weight:500;
+  font-variant-numeric:tabular-nums;
+}
+.mark{position:absolute;top:13px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:#3e2410}
+.mark.live{background:var(--red);box-shadow:0 0 0 2px #fff4d088}
+.needle{
+  position:absolute;top:0;bottom:0;left:50%;width:3px;margin-left:-1.5px;
+  background:var(--red);box-shadow:0 0 7px #ff31408f;pointer-events:none;
+}
+
+/* المفاتيح */
+.controls{display:flex;direction:ltr;align-items:center;justify-content:center;gap:18px;padding:18px 0 14px}
+.knob{
+  width:58px;height:58px;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle at 36% 30%,#e1c088,var(--brass) 55%,#70522a);
+  color:var(--ink);box-shadow:0 2px 0 #0007;
+}
+.knob.big{width:82px;height:82px;background:radial-gradient(circle at 36% 30%,#ff6a72,var(--red) 58%,#7d0f19);color:#fff}
+.knob svg{width:26px;height:26px;fill:currentColor}
+.knob.big svg{width:34px;height:34px}
+.knob:active{transform:translateY(1px)}
+.fav.is-fav{color:#8b0e1b}
+
+/* القوائم */
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--wood-3);margin-bottom:10px}
+.tabs button{padding:9px 4px;font-family:"Reem Kufi",serif;font-size:17px;color:var(--ivory-dim);border-bottom:3px solid transparent}
+.tabs button[aria-selected="true"]{color:var(--amber);border-bottom-color:var(--amber)}
+.search{
+  width:100%;height:46px;padding:0 14px;border-radius:8px;
+  background:var(--wood-2);border:1px solid var(--wood-3);margin-bottom:6px;
+}
+.search::placeholder{color:var(--ivory-dim)}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:grid;grid-template-columns:1fr 48px;align-items:center;border-bottom:1px solid #4c312266}
+.row-main{display:block;width:100%;min-width:0;padding:9px 2px;text-align:right}
+.row-main b{display:block;font-weight:600;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-main small{display:block;font-size:14px;color:var(--ivory-dim);line-height:1.4}
+.row-star{height:48px;display:grid;place-items:center;color:var(--ivory-dim)}
+.row-star svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8}
+.row-star.is-fav{color:var(--amber)}
+.row-star.is-fav svg{fill:currentColor}
+li.current .row-main b{color:var(--amber)}
+.notice{padding:22px 8px;text-align:center;color:var(--ivory-dim)}
+.notice button{display:inline-block;margin-top:10px;padding:8px 20px;border-radius:8px;background:var(--amber);color:var(--ink);font-weight:600}
+@media (prefers-reduced-motion:reduce){.scale.snap,.panel{transition:none}}
+@media (max-width:430px){.grille{display:none}.brand{justify-content:center;text-align:center}}
+@media (max-width:370px){.freq{font-size:39px;min-width:92px}.controls{gap:12px}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="brand">
+    <h1>محطة دهشان الإذاعية ترحب بكم</h1>
+    <div class="grille" aria-hidden="true"></div>
+  </header>
+
+  <section class="panel" aria-label="مؤشر الراديو">
+    <div class="readout">
+      <div class="freq"><span id="freqNum">87.5</span><small id="freqUnit">MHz</small></div>
+      <div class="now" aria-live="polite">
+        <strong id="nowName">الراديو</strong>
+        <span id="nowStatus">جارٍ تحميل المحطات…</span>
+      </div>
+    </div>
+    <div class="dial" id="dial" role="slider" tabindex="0" aria-label="مؤشر التردد"
+         aria-valuemin="87.5" aria-valuemax="108" aria-valuenow="87.5">
+      <div class="scale" id="scale"></div>
+      <div class="needle"></div>
+    </div>
+  </section>
+
+  <div class="controls">
+    <button class="knob" id="prevBtn" aria-label="المحطة السابقة">
+      <svg viewBox="0 0 24 24"><path d="M6 5h2.5v14H6zM20 5v14L9.5 12z"/></svg>
+    </button>
+    <button class="knob big" id="powerBtn" aria-label="تشغيل">
+      <svg viewBox="0 0 24 24"><path id="powerIcon" d="M7 4v16l14-8z"/></svg>
+    </button>
+    <button class="knob" id="nextBtn" aria-label="المحطة التالية">
+      <svg viewBox="0 0 24 24"><path d="M15.5 5H18v14h-2.5zM4 5l10.5 7L4 19z"/></svg>
+    </button>
+    <button class="knob fav" id="favBtn" aria-label="أضف إلى المفضلة">
+      <svg viewBox="0 0 24 24"><path d="m12 3 2.8 5.8 6.4.9-4.6 4.4 1.1 6.3L12 17.5l-5.7 2.9 1.1-6.3L2.800 9.700l6.400-.900z"/></svg>
+    </button>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="jo" aria-selected="true">الأردن</button>
+    <button role="tab" data-tab="ar" aria-selected="false">عربية</button>
+    <button role="tab" data-tab="fav" aria-selected="false">المفضلة</button>
+  </nav>
+  <input class="search" id="search" type="search" placeholder="ابحث عن محطة" aria-label="ابحث عن محطة">
+  <ul class="list" id="list"></ul>
+  <div id="notice"></div>
+</main>
+
+<audio id="audio" preload="none"></audio>
+
+<script>
+'use strict';
+/* ========= الإعدادات ========= */
+const FM_MIN = 87.5, FM_MAX = 108;
+const PX = 96;                         // عدد البكسلات لكل ميغاهرتز، ويطابق --px-per-mhz
+const HOSTS = ['de1', 'nl1', 'at1', 'de2'];
+const CONNECT_TIMEOUT = 13000;         // مهلة تجربة رابط البث
+const STATIC_VOLUME = 0.035;           // مستوى صوت التشويش بين المحطات
+
+/* المحطات الأردنية وتردداتها في عمّان: الترتيب مهم، فالأدق يأتي أولًا */
+const KNOWN = [
+  {id:'tarab',   ar:'روتانا طرب',          f:107.5, re:/tarab|طرب/},
+  {id:'rotana',  ar:'راديو روتانا',         f:99.9,  re:/rotana|روتانا/},
+  {id:'sawa',    ar:'راديو سوا الأردن',     f:98.1,  re:/sawa|سوا/},
+  {id:'melody',  ar:'ميلودي الأردن',        f:91.1,  re:/melody|ميلودي/},
+  {id:'quran',   ar:'إذاعة القرآن الكريم',  f:93.1,  re:/quran|قرآن|قران/},
+  {id:'yaqeen',  ar:'يقين',                 f:103.7, re:/yaqeen|يقين/},
+  {id:'hayat',   ar:'راديو حياة',           f:104.7, re:/hayat|حياة/},
+  {id:'husna',   ar:'إذاعة حسنى',           f:93.3,  re:/husna|حسنى/},
+  {id:'hala',    ar:'راديو هلا',            f:102.1, re:/\bhala\b|هلا/},
+  {id:'mazaj',   ar:'مزاج إف إم',           f:95.3,  re:/^(?!.*(gold|soft)).*(mazaj|مزاج)/},
+  {id:'mood',    ar:'مود 92',               f:92.0,  re:/\bmood\b/},
+  {id:'play',    ar:'بلاي 99.5',            f:99.5,  re:/\bplay\b/},
+  {id:'beat',    ar:'بيت إف إم',            f:102.5, re:/\bbeat\b/},
+  {id:'watar',   ar:'وتر إف إم',            f:91.5,  re:/watar|وتر/},
+  {id:'ju',      ar:'إذاعة الجامعة الأردنية', f:94.9, re:/jufm|ju fm|الجامعة/},
+  {id:'balad',   ar:'راديو البلد',          f:92.5,  re:/balad|البلد|amman ?net|عمان نت/},
+  {id:'fann',    ar:'راديو فن',             f:104.2, re:/fann|راديو فن/},
+  {id:'farah',   ar:'فرح الناس',            f:98.5,  re:/farah|فرح/},
+  {id:'nai',     ar:'راديو ناي',            f:101.5, re:/\bnai\b|ناي/},
+  {id:'bliss',   ar:'بليس',                 f:104.3, re:/bliss/},
+  {id:'jordan',  ar:'الإذاعة الأردنية',     f:95.1,  re:/jrtv|radio jordan|jordan radio|الإذاعة الأردنية|الاذاعة الاردنية/},
+];
+
+/* ========= أدوات مساعدة ========= */
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+let regionNames = null;
+try { regionNames = new Intl.DisplayNames(['ar'], {type:'region'}); } catch {}
+const countryName = (cc, fallback) => {
+  try { return (cc && regionNames && regionNames.of(cc)) || fallback || ''; } catch { return fallback || ''; }
+};
+const norm = s => (s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+/* ========= الحالة ========= */
+const audio = $('audio');
+let stations = [];
+let tab = 'jo';
+let query = '';
+let current = null;
+let freq = 95.3;
+let on = false;
+let favs = new Set(store.get('radio.favs', []));
+
+let attempt = 0;          // يلغي محاولات الاتصال القديمة
+let urlIndex = 0;
+let connectTimer = 0;
+let tuneTimer = 0;
+
+/* ========= تحميل المحطات ========= */
+async function api(path){
+  let lastError;
+  for (const host of HOSTS){
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 9000);
+    try {
+      const res = await fetch(`https://${host}.api.radio-browser.info${path}`, {signal: ctrl.signal});
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    } catch (e) { lastError = e; }
+    finally { clearTimeout(t); }
+  }
+  throw lastError;
+}
+
+function usable(s){
+  const url = s.url_resolved || s.url;
+  if (!url || !/^https?:/i.test(url)) return false;
+  if (/h\.?26|video|mp4v|vp\d/i.test(s.codec || '')) return false;
+  if (/noursat|\btv\b/i.test(s.name || '')) return false;
+  return true;
+}
+
+function buildStations(joRaw, arRaw){
+  const map = new Map();
+  const add = (s, group) => {
+    if (!usable(s)) return;
+    const lower = (s.name || '').toLowerCase();
+    const known = group === 'jo' ? KNOWN.find(k => k.re.test(lower)) : null;
+    const id = known ? known.id : norm(s.name);
+    if (!id) return;
+    let st = map.get(id);
+    if (!st){
+      st = {
+        id,
+        name: known ? known.ar : (s.name || '').trim(),
+        f: known ? known.f : null,
+        group,
+        country: countryName(s.countrycode, s.country),
+        sources: []
+      };
+      map.set(id, st);
+    }
+    st.sources.push({url: s.url_resolved || s.url, bitrate: +s.bitrate || 0, hls: +s.hls === 1});
+  };
+  joRaw.forEach(s => add(s, 'jo'));
+  arRaw.forEach(s => add(s, 'ar'));
+
+  const list = [...map.values()];
+  list.forEach(st => {
+    const seen = new Set();
+    st.urls = st.sources
+      .sort((a, b) => (a.hls - b.hls) || (/^https/i.test(b.url) - /^https/i.test(a.url)) || (b.bitrate - a.bitrate))
+      .map(x => x.url)
+      .filter(u => seen.has(u) ? false : (seen.add(u), true));
+    delete st.sources;
+  });
+  return list;
+}
+
+async function loadStations(){
+  $('notice').textContent = '';
+  try {
+    const [jo, ar] = await Promise.all([
+      api('/json/stations/search?countrycode=JO&hidebroken=true&order=votes&reverse=true&limit=200'),
+      api('/json/stations/search?language=arabic&hidebroken=true&order=clickcount&reverse=true&limit=150')
+    ]);
+    stations = buildStations(jo, ar);
+    if (!stations.length) throw new Error('empty');
+    store.set('radio.stations', stations);
+  } catch {
+    stations = store.get('radio.stations', []);
+    if (!stations.length){
+      setNow('الراديو', 'تعذر تحميل المحطات');
+      showNotice('تأكد من اتصال الهاتف بالإنترنت، ثم أعد المحاولة.', 'إعادة المحاولة', loadStations);
+      return;
+    }
+  }
+  drawMarks();
+  const lastId = store.get('radio.last', null);
+  current = stations.find(s => s.id === lastId) || dialStations()[0] || stations[0];
+  showStationFreq(current);
+  setNow(current.name, 'اضغط الزر الأحمر للاستماع');
+  syncFav();
+  render();
+}
+
+/* ========= المؤشر ========= */
+function dialStations(){
+  return stations.filter(s => s.f).sort((a, b) => a.f - b.f);
+}
+function buildScale(){
+  const scale = $('scale');
+  for (let f = 88; f <= 108; f += 2){
+    const n = document.createElement('span');
+    n.className = 'tick-num';
+    n.textContent = f;
+    n.style.left = (f - FM_MIN) * PX + 'px';
+    scale.appendChild(n);
+  }
+}
+function drawMarks(){
+  const scale = $('scale');
+  scale.querySelectorAll('.mark').forEach(m => m.remove());
+  dialStations().forEach(s => {
+    const m = document.createElement('span');
+    m.className = 'mark';
+    m.dataset.id = s.id;
+    m.style.left = (s.f - FM_MIN) * PX + 'px';
+    scale.appendChild(m);
+  });
+  highlightMark();
+}
+function highlightMark(){
+  document.querySelectorAll('.mark').forEach(m => m.classList.toggle('live', !!current && m.dataset.id === current.id));
+}
+function setFreq(f, animate = true){
+  freq = Math.min(FM_MAX, Math.max(FM_MIN, f));
+  const scale = $('scale');
+  scale.classList.toggle('snap', animate);
+  scale.style.transform = `translateX(${-(freq - FM_MIN) * PX}px)`;
+  $('freqNum').textContent = freq.toFixed(1);
+  $('freqUnit').textContent = 'MHz';
+  const dial = $('dial');
+  dial.setAttribute('aria-valuenow', freq.toFixed(1));
+  dial.setAttribute('aria-valuetext', freq.toFixed(1) + ' ميغاهرتز');
+}
+function showStationFreq(st){
+  if (st.f) return setFreq(st.f);
+  $('freqNum').textContent = '—';
+  $('freqUnit').textContent = 'عبر الإنترنت';
+}
+function nearestStation(f, within){
+  let best = null, gap = Infinity;
+  dialStations().forEach(s => {
+    const d = Math.abs(s.f - f);
+    if (d < gap){ gap = d; best = s; }
+  });
+  return gap <= within ? best : null;
+}
+
+function initDial(){
+  const dial = $('dial');
+  let startX = 0, startF = 0, dragging = false, moved = false;
+
+  dial.addEventListener('pointerdown', e => {
+    dragging = true; moved = false;
+    startX = e.clientX; startF = freq;
+    dial.setPointerCapture(e.pointerId);
+    ensureAudioContext();
+  });
+  dial.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 3) moved = true;
+    if (!moved) return;
+    setFreq(startF - dx / PX, false);
+    tuneToDial(.06, 320);
+  });
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (!moved) return;
+    tuneToDial(.3, 0);
+  };
+  dial.addEventListener('pointerup', end);
+  dial.addEventListener('pointercancel', end);
+
+  dial.addEventListener('keydown', e => {
+    const step = {ArrowLeft:-.1, ArrowRight:.1, ArrowDown:-.1, ArrowUp:.1}[e.key];
+    if (!step) return;
+    e.preventDefault();
+    ensureAudioContext();
+    setFreq(Math.round((freq + step) * 10) / 10);
+    tuneToDial(.06, 320);
+  });
+}
+
+/* يربط موضع المؤشر بأقرب محطة، أو يُسمع التشويش إن لم توجد محطة */
+function tuneToDial(within, delay){
+  clearTimeout(tuneTimer);
+  const st = nearestStation(freq, within);
+  if (!st){
+    on = true; syncPower();
+    stopStream();
+    notifyNative(false);
+    current = null;
+    highlightMark(); syncFav(); render();
+    setNow('لا توجد محطة هنا', 'حرّك المؤشر نحو النقاط على التدريج');
+    setStatic(true);
+    return;
+  }
+  if (delay === 0) setFreq(st.f);
+  if (current && st.id === current.id && !audio.paused) return;
+  tuneTimer = setTimeout(() => play(st), delay);
+}
+
+/* ========= التشغيل ========= */
+function candidateUrls(st){
+  const secure = location.protocol === 'https:';
+  const urls = secure ? st.urls.map(u => u.replace(/^http:/i, 'https:')) : st.urls;
+  return [...new Set(urls)];
+}
+
+function play(st){
+  ensureAudioContext();
+  on = true; syncPower();
+  current = st;
+  store.set('radio.last', st.id);
+  showStationFreq(st);
+  highlightMark(); syncFav(); render();
+  setNow(st.name, 'جارٍ الاتصال بالمحطة…');
+  setStatic(true);
+  urlIndex = 0;
+  attempt++;
+  connect(attempt);
+  updateMediaSession();
+}
+
+function connect(id){
+  if (id !== attempt || !current) return;
+  const urls = candidateUrls(current);
+  if (urlIndex >= urls.length){
+    stopStream();
+    setStatic(false);
+    notifyNative(false);
+    setNow(current.name, 'هذه المحطة لا تبث الآن، فجرّب محطة أخرى');
+    return;
+  }
+  clearTimeout(connectTimer);
+  const index = urlIndex;
+  connectTimer = setTimeout(() => failed(id, index), CONNECT_TIMEOUT);
+  audio.src = urls[index];
+  const p = audio.play();
+  if (p) p.catch(err => {
+    if (id !== attempt) return;
+    if (err && err.name === 'AbortError') return;
+    if (err && err.name === 'NotAllowedError'){
+      clearTimeout(connectTimer);
+      on = false; syncPower(); setStatic(false);
+      setNow(current.name, 'اضغط الزر الأحمر للاستماع');
+      return;
+    }
+    failed(id, index);
+  });
+}
+
+/* قد يصل الخطأ نفسه من مصدرين، فلا ننتقل إلا مرة واحدة لكل رابط */
+function failed(id, index){
+  if (id !== attempt || index !== urlIndex) return;
+  urlIndex++;
+  connect(id);
+}
+
+/* يُبلغ تطبيق أندرويد ليبقي التشغيل مستمرًا والشاشة مطفأة */
+function notifyNative(playing, name){
+  try { if (window.AndroidRadio) window.AndroidRadio.setPlaying(playing, name || ''); } catch {}
+}
+
+function stopStream(){
+  attempt++;
+  clearTimeout(connectTimer);
+  clearTimeout(tuneTimer);
+  audio.pause();
+  audio.removeAttribute('src');
+  audio.load();
+}
+
+function powerOff(){
+  on = false;
+  stopStream();
+  setStatic(false);
+  syncPower();
+  notifyNative(false);
+  if (current) setNow(current.name, 'متوقف');
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+}
+
+function togglePower(){
+  ensureAudioContext();
+  if (on) return powerOff();
+  const st = current || nearestStation(freq, 25) || stations[0];
+  if (st) play(st);
+}
+
+audio.addEventListener('playing', () => {
+  clearTimeout(connectTimer);
+  setStatic(false);
+  if (current){
+    setNow(current.name, 'على الهواء');
+    notifyNative(true, current.name);
+  }
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+});
+audio.addEventListener('waiting', () => { if (on && current) setNow(current.name, 'جارٍ التحميل…'); });
+audio.addEventListener('error', () => { if (on && audio.getAttribute('src')) failed(attempt, urlIndex); });
+audio.addEventListener('ended', () => { if (on && current) play(current); });
+
+function seek(dir){
+  const list = visibleStations();
+  if (!list.length) return;
+  const i = current ? list.findIndex(s => s.id === current.id) : -1;
+  const next = i === -1 ? (dir > 0 ? 0 : list.length - 1) : (i + dir + list.length) % list.length;
+  play(list[next]);
+}
+
+/* ========= تشويش الراديو ========= */
+let audioCtx = null, staticGain = null;
+function ensureAudioContext(){
+  if (audioCtx){
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    return;
+  }
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  try {
+    audioCtx = new Ctx();
+    const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer; noise.loop = true;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass'; filter.frequency.value = 2400; filter.Q.value = .5;
+    staticGain = audioCtx.createGain();
+    staticGain.gain.value = 0;
+    noise.connect(filter).connect(staticGain).connect(audioCtx.destination);
+    noise.start();
+  } catch { audioCtx = null; staticGain = null; }
+}
+function setStatic(active){
+  if (!staticGain) return;
+  staticGain.gain.setTargetAtTime(active ? STATIC_VOLUME : 0, audioCtx.currentTime, .05);
+}
+
+/* ========= الواجهة ========= */
+function setNow(name, status){
+  $('nowName').textContent = name;
+  $('nowStatus').textContent = status;
+}
+function syncPower(){
+  document.body.classList.toggle('on', on);
+  $('powerIcon').setAttribute('d', on ? 'M6 6h12v12H6z' : 'M7 4v16l14-8z');
+  $('powerBtn').setAttribute('aria-label', on ? 'إيقاف' : 'تشغيل');
+}
+function syncFav(){
+  const isFav = !!current && favs.has(current.id);
+  $('favBtn').classList.toggle('is-fav', isFav);
+  $('favBtn').setAttribute('aria-label', isFav ? 'أزل من المفضلة' : 'أضف إلى المفضلة');
+}
+function toggleFav(id){
+  favs.has(id) ? favs.delete(id) : favs.add(id);
+  store.set('radio.favs', [...favs]);
+  syncFav(); render();
+}
+function visibleStations(){
+  let list;
+  if (query) {
+    const q = query.toLowerCase();
+    list = stations.filter(s => s.name.toLowerCase().includes(q) || (s.country || '').includes(query));
+  } else if (tab === 'fav') list = stations.filter(s => favs.has(s.id));
+  else list = stations.filter(s => s.group === tab);
+  return [...list].sort((a, b) => {
+    if (a.f && b.f) return a.f - b.f;
+    if (a.f) return -1;
+    if (b.f) return 1;
+    return 0;
+  });
+}
+function showNotice(text, btnLabel, action){
+  const box = $('notice');
+  box.textContent = '';
+  const p = document.createElement('div');
+  p.className = 'notice';
+  p.textContent = text;
+  if (btnLabel){
+    p.appendChild(document.createElement('br'));
+    const b = document.createElement('button');
+    b.textContent = btnLabel;
+    b.onclick = action;
+    p.appendChild(b);
+  }
+  box.appendChild(p);
+}
+function render(){
+  const ul = $('list');
+  ul.textContent = '';
+  $('notice').textContent = '';
+  const list = visibleStations();
+  if (!list.length){
+    if (query) showNotice('لا توجد محطة بهذا الاسم.');
+    else if (tab === 'fav') showNotice('اضغط النجمة بجانب أي محطة لتجدها هنا.');
+    else if (stations.length) showNotice('لا توجد محطات في هذه القائمة الآن.');
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  list.forEach(s => {
+    const li = document.createElement('li');
+    if (current && current.id === s.id) li.className = 'current';
+    const main = document.createElement('button');
+    main.className = 'row-main';
+    const b = document.createElement('b'); b.textContent = s.name;
+    const sm = document.createElement('small');
+    sm.textContent = s.f ? `FM ${s.f.toFixed(1)}` : (s.country || 'بث عبر الإنترنت');
+    main.append(b, sm);
+    main.onclick = () => play(s);
+    const star = document.createElement('button');
+    star.className = 'row-star' + (favs.has(s.id) ? ' is-fav' : '');
+    star.setAttribute('aria-label', (favs.has(s.id) ? 'أزل من المفضلة: ' : 'أضف إلى المفضلة: ') + s.name);
+    star.innerHTML = '<svg viewBox="0 0 24 24"><path d="m12 3 2.800 5.800 6.400.9-4.600 4.400 1.100 6.300L12 17.500l-5.700 2.900 1.100-6.300L2.800 9.700l6.400-.9z"/></svg>';
+    star.onclick = () => toggleFav(s.id);
+    li.append(main, star);
+    frag.appendChild(li);
+  });
+  ul.appendChild(frag);
+}
+
+function updateMediaSession(){
+  if (!('mediaSession' in navigator) || !current) return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: current.name,
+      artist: current.f ? `FM ${current.f.toFixed(1)}` : (current.country || 'راديو')
+    });
+    navigator.mediaSession.setActionHandler('play', () => { if (!on) togglePower(); });
+    navigator.mediaSession.setActionHandler('pause', () => { if (on) powerOff(); });
+    navigator.mediaSession.setActionHandler('stop', () => { if (on) powerOff(); });
+    navigator.mediaSession.setActionHandler('previoustrack', () => seek(-1));
+    navigator.mediaSession.setActionHandler('nexttrack', () => seek(1));
+  } catch {}
+}
+
+/* ========= التهيئة ========= */
+$('powerBtn').onclick = togglePower;
+$('prevBtn').onclick = () => seek(-1);
+$('nextBtn').onclick = () => seek(1);
+$('favBtn').onclick = () => { if (current) toggleFav(current.id); };
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.onclick = () => {
+    tab = btn.dataset.tab;
+    document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+    render();
+  };
+});
+$('search').addEventListener('input', e => { query = e.target.value.trim(); render(); });
+
+buildScale();
+setFreq(freq, false);
+initDial();
+syncPower();
+loadStations();
+</script>
+</body>
+</html>
