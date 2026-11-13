@@ -189,6 +189,8 @@ const PX = 96;                         // عدد البكسلات لكل ميغ�
 const HOSTS = ['de1', 'nl1', 'at1', 'de2'];
 const CONNECT_TIMEOUT = 13000;         // مهلة تجربة رابط البث
 const STATIC_VOLUME = 0.035;           // مستوى صوت التشويش بين المحطات
+const STALL_LIMIT = 15000;             // إذا توقف تقدّم الصوت هذه المدة يُعاد الاتصال
+const MAX_RETRIES = 40;                // أقصى عدد لمحاولات إعادة الاتصال المتتالية
 
 /* المحطات الأردنية وتردداتها في عمّان: الترتيب مهم، فالأدق يأتي أولًا */
 const KNOWN = [
@@ -242,6 +244,13 @@ let attempt = 0;          // يلغي محاولات الاتصال القديم
 let urlIndex = 0;
 let connectTimer = 0;
 let tuneTimer = 0;
+
+/* حالة إعادة الاتصال التلقائي */
+let playedOk = false;     // هل بدأ الرابط الحالي بالبث فعلًا
+let retries = 0;          // عدد محاولات إعادة الاتصال المتتالية
+let reconnectTimer = 0;
+let lastTime = -1;        // آخر موضع وصل إليه الصوت
+let lastTick = Date.now();// متى تقدّم الصوت آخر مرة
 
 /* ========= تحميل المحطات ========= */
 async function api(path){
@@ -457,6 +466,8 @@ function play(st){
   setNow(st.name, 'جارٍ الاتصال بالمحطة…');
   setStatic(true);
   urlIndex = 0;
+  retries = 0;
+  clearTimeout(reconnectTimer);
   attempt++;
   connect(attempt);
   updateMediaSession();
@@ -466,14 +477,26 @@ function connect(id){
   if (id !== attempt || !current) return;
   const urls = candidateUrls(current);
   if (urlIndex >= urls.length){
+    // أثناء إعادة الاتصال نعود لأول رابط ونحاول من جديد بدل الاستسلام
+    if (retries > 0 && retries < MAX_RETRIES){
+      urlIndex = 0;
+      reconnect();
+      return;
+    }
     stopStream();
     setStatic(false);
-    setNow(current.name, 'هذه المحطة لا تبث الآن، فجرّب محطة أخرى');
+    setNow(current.name, retries > 0
+      ? 'تعذر إعادة الاتصال، اضغط الزر الأحمر للمحاولة'
+      : 'هذه المحطة لا تبث الآن، فجرّب محطة أخرى');
+    if (retries > 0){ on = false; syncPower(); }
     return;
   }
   clearTimeout(connectTimer);
   const index = urlIndex;
   connectTimer = setTimeout(() => failed(id, index), CONNECT_TIMEOUT);
+  playedOk = false;
+  lastTime = -1;
+  lastTick = Date.now();
   audio.src = urls[index];
   const p = audio.play();
   if (p) p.catch(err => {
@@ -500,10 +523,43 @@ function stopStream(){
   attempt++;
   clearTimeout(connectTimer);
   clearTimeout(tuneTimer);
+  clearTimeout(reconnectTimer);
+  playedOk = false;
   audio.pause();
   audio.removeAttribute('src');
   audio.load();
 }
+
+/* إعادة الاتصال بنفس المحطة بعد انقطاع البث */
+function reconnect(){
+  if (!on || !current) return;
+  retries++;
+  if (retries > MAX_RETRIES){
+    retries = MAX_RETRIES;
+    urlIndex = candidateUrls(current).length; // يُظهر رسالة التعذّر
+    connect(attempt);
+    return;
+  }
+  // بعد محاولتين فاشلتين على نفس الرابط نجرّب الرابط التالي للمحطة
+  if (retries > 1 && retries % 2 === 1) urlIndex++;
+  attempt++;
+  const id = attempt;
+  clearTimeout(connectTimer);
+  clearTimeout(reconnectTimer);
+  playedOk = false;
+  audio.pause();
+  audio.removeAttribute('src');
+  audio.load();                       // يحرّر الاتصال القديم تمامًا
+  setNow(current.name, 'انقطع البث، جارٍ إعادة الاتصال…');
+  const delay = Math.min(1000 * retries, 8000); // انتظار يتزايد تدريجيًا
+  reconnectTimer = setTimeout(() => connect(id), delay);
+}
+
+/* مراقب يفحص كل بضع ثوانٍ: هل الصوت يتقدّم فعلًا؟ */
+setInterval(() => {
+  if (!on || !current || !playedOk) return;
+  if (Date.now() - lastTick > STALL_LIMIT) reconnect();
+}, 4000);
 
 function powerOff(){
   on = false;
@@ -523,13 +579,37 @@ function togglePower(){
 
 audio.addEventListener('playing', () => {
   clearTimeout(connectTimer);
+  playedOk = true;
+  retries = 0;
+  lastTick = Date.now();
   setStatic(false);
   if (current) setNow(current.name, 'على الهواء');
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 });
+audio.addEventListener('timeupdate', () => {
+  if (audio.currentTime !== lastTime){
+    lastTime = audio.currentTime;
+    lastTick = Date.now();
+  }
+});
 audio.addEventListener('waiting', () => { if (on && current) setNow(current.name, 'جارٍ التحميل…'); });
-audio.addEventListener('error', () => { if (on && audio.getAttribute('src')) failed(attempt, urlIndex); });
-audio.addEventListener('ended', () => { if (on && current) play(current); });
+audio.addEventListener('error', () => {
+  if (!on || !audio.getAttribute('src')) return;
+  // إذا كان الرابط يعمل ثم انقطع نعيد الاتصال، وإلا نجرّب الرابط التالي
+  if (playedOk) reconnect();
+  else failed(attempt, urlIndex);
+});
+audio.addEventListener('ended', () => { if (on && current) reconnect(); });
+
+/* عند رجوع الإنترنت أو الرجوع للتطبيق نتأكد أن البث شغّال */
+window.addEventListener('online', () => {
+  if (on && current && Date.now() - lastTick > 3000){ retries = 0; reconnect(); }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !on || !current) return;
+  ensureAudioContext();
+  if (Date.now() - lastTick > 5000){ retries = 0; reconnect(); }
+});
 
 function seek(dir){
   const list = visibleStations();
