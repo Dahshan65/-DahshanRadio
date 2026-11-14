@@ -1,107 +1,102 @@
-name: Build APK
+name: Build APK - محطات إذاعية
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
       - name: Create Android project
-        shell: bash
         run: |
           set -e
-          J=app/src/main/java/com/dahshan/radio
-          R=app/src/main/res
-          mkdir -p "$J" app/src/main/assets "$R/values" "$R/drawable" "$R/mipmap-anydpi-v26"
-          cp radio.html app/src/main/assets/radio.html
+          P=android
+          J=$P/app/src/main/java/com/dahshansoft/radio
+          mkdir -p $J $P/app/src/main/assets $P/app/src/main/res/mipmap-xxhdpi $P/app/src/main/res/mipmap-xxxhdpi
+          cp index.html manifest.json icon-192.png icon-512.png $P/app/src/main/assets/
+          cp icon-192.png $P/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          cp icon-512.png $P/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
-          cat > settings.gradle <<'FILE_END'
+          cat > $P/settings.gradle <<'EOF'
           pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
           }
           dependencyResolutionManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
           }
-          rootProject.name = 'DahshanRadio'
+          rootProject.name = "MahattatIdhaiya"
           include ':app'
-          FILE_END
+          EOF
 
-          cat > build.gradle <<'FILE_END'
-          plugins {
-              id 'com.android.application' version '8.5.2' apply false
-          }
-          FILE_END
+          cat > $P/build.gradle <<'EOF'
+          plugins { id 'com.android.application' version '8.7.3' apply false }
+          EOF
 
-          cat > gradle.properties <<'FILE_END'
+          cat > $P/gradle.properties <<'EOF'
+          android.useAndroidX=true
           org.gradle.jvmargs=-Xmx2g
-          FILE_END
+          EOF
 
-          cat > app/build.gradle <<'FILE_END'
-          plugins {
-              id 'com.android.application'
-          }
+          cat > $P/app/build.gradle <<'EOF'
+          plugins { id 'com.android.application' }
           android {
-              namespace 'com.dahshan.radio'
-              compileSdk 34
+              namespace 'com.dahshansoft.radio'
+              compileSdk 35
               defaultConfig {
-                  applicationId 'com.dahshan.radio'
-                  minSdk 26
-                  targetSdk 34
-                  versionCode 1
-                  versionName '1.0'
+                  applicationId 'com.dahshansoft.radio'
+                  minSdk 24
+                  targetSdk 35
+                  versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger())
+                  versionName "1." + (System.getenv('GITHUB_RUN_NUMBER') ?: '0')
               }
               compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_11
-                  targetCompatibility JavaVersion.VERSION_11
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
               }
           }
-          FILE_END
+          dependencies { implementation 'androidx.webkit:webkit:1.12.1' }
+          EOF
 
-          cat > app/src/main/AndroidManifest.xml <<'FILE_END'
+          cat > $P/app/src/main/AndroidManifest.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
               <uses-permission android:name="android.permission.WAKE_LOCK" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
               <application
-                  android:label="@string/app_name"
+                  android:label="محطات إذاعية"
                   android:icon="@mipmap/ic_launcher"
-                  android:theme="@style/AppTheme"
                   android:supportsRtl="true"
-                  android:usesCleartextTraffic="true">
+                  android:usesCleartextTraffic="true"
+                  android:theme="@android:style/Theme.Material.NoActionBar">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
                       android:launchMode="singleTask"
-                      android:windowSoftInputMode="adjustResize"
-                      android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale">
+                      android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -110,120 +105,84 @@ jobs:
                   <service
                       android:name=".RadioService"
                       android:exported="false"
-                      android:stopWithTask="true"
                       android:foregroundServiceType="mediaPlayback" />
               </application>
           </manifest>
-          FILE_END
+          EOF
 
-          cat > "$R/values/strings.xml" <<'FILE_END'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">محطة دهشان</string>
-          </resources>
-          FILE_END
+          cat > $J/MainActivity.java <<'EOF'
+          package com.dahshansoft.radio;
 
-          cat > "$R/values/styles.xml" <<'FILE_END'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
-                  <item name="android:windowBackground">@color/wood</item>
-                  <item name="android:statusBarColor">@color/wood</item>
-                  <item name="android:navigationBarColor">@color/wood</item>
-              </style>
-              <color name="wood">#2A1A12</color>
-          </resources>
-          FILE_END
-
-          cat > "$R/mipmap-anydpi-v26/ic_launcher.xml" <<'FILE_END'
-          <?xml version="1.0" encoding="utf-8"?>
-          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@color/wood" />
-              <foreground android:drawable="@drawable/ic_radio" />
-          </adaptive-icon>
-          FILE_END
-
-          cat > "$R/drawable/ic_radio.xml" <<'FILE_END'
-          <?xml version="1.0" encoding="utf-8"?>
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="108dp" android:height="108dp"
-              android:viewportWidth="108" android:viewportHeight="108">
-              <path android:strokeColor="#B8935A" android:strokeWidth="3" android:strokeLineCap="round"
-                  android:pathData="M36,41 L66,25" />
-              <path android:fillColor="#F4C566"
-                  android:pathData="M31,40 H77 A5,5 0 0 1 82,45 V75 A5,5 0 0 1 77,80 H31 A5,5 0 0 1 26,75 V45 A5,5 0 0 1 31,40 Z" />
-              <path android:fillColor="#2A1A12"
-                  android:pathData="M33,47 H75 V57 H33 Z" />
-              <path android:fillColor="#D3202F"
-                  android:pathData="M52,45 H55 V59 H52 Z" />
-              <path android:fillColor="#D3202F"
-                  android:pathData="M64,62 A6.500,6.500 0 1 1 64,75 A6.500,6.500 0 1 1 64,62 Z" />
-              <path android:fillColor="#2A1A12"
-                  android:pathData="M33,63 H52 V65.500 H33 Z M33,68 H52 V70.500 H33 Z M33,73 H52 V75.500 H33 Z" />
-          </vector>
-          FILE_END
-
-          cat > "$R/drawable/ic_notify.xml" <<'FILE_END'
-          <?xml version="1.0" encoding="utf-8"?>
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="24dp" android:height="24dp"
-              android:viewportWidth="24" android:viewportHeight="24">
-              <path android:fillColor="#FFFFFF"
-                  android:pathData="M3,8 L17,2.500 L17.700,4.300 L8,8 H20 A2,2 0 0 1 22,10 V20 A2,2 0 0 1 20,22 H4 A2,2 0 0 1 2,20 V10 A2,2 0 0 1 3,8 Z M5,11 V14 H19 V11 Z M16,16 A2,2 0 1 0 16,20 A2,2 0 1 0 16,16 Z" />
-          </vector>
-          FILE_END
-
-          cat > "$J/MainActivity.java" <<'FILE_END'
-          package com.dahshan.radio;
-
-          import android.Manifest;
           import android.app.Activity;
-          import android.content.Context;
           import android.content.Intent;
           import android.content.pm.PackageManager;
-          import android.graphics.Color;
-          import android.media.AudioManager;
+          import android.net.Uri;
           import android.os.Build;
           import android.os.Bundle;
           import android.webkit.JavascriptInterface;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebResourceResponse;
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
+          import androidx.webkit.WebViewAssetLoader;
+          import java.lang.ref.WeakReference;
 
           public class MainActivity extends Activity {
-              private static volatile MainActivity current;
+              static WeakReference<MainActivity> instance = new WeakReference<>(null);
+              private static final String HOST = "appassets.androidplatform.net";
               private WebView web;
 
               @Override
-              protected void onCreate(Bundle state) {
-                  super.onCreate(state);
-                  current = this;
-                  setVolumeControlStream(AudioManager.STREAM_MUSIC);
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  instance = new WeakReference<>(this);
+                  getWindow().setStatusBarColor(0xFF2A1A12);
+                  getWindow().setNavigationBarColor(0xFF2A1A12);
+
+                  if (Build.VERSION.SDK_INT >= 33
+                          && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+                      requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 1);
+                  }
 
                   web = new WebView(this);
+                  web.setBackgroundColor(0xFF2A1A12);
                   setContentView(web);
-                  web.setBackgroundColor(Color.parseColor("#2a1a12"));
-                  web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
-                  web.setWebViewClient(new WebViewClient());
 
                   WebSettings s = web.getSettings();
                   s.setJavaScriptEnabled(true);
                   s.setDomStorageEnabled(true);
                   s.setMediaPlaybackRequiresUserGesture(false);
-                  s.setAllowFileAccess(true);
+                  s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
-                  web.addJavascriptInterface(new Bridge(getApplicationContext()), "AndroidRadio");
-                  web.loadUrl("file:///android_asset/radio.html");
+                  final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
+                          .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                          .build();
 
-                  if (Build.VERSION.SDK_INT >= 33
-                          && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                          != PackageManager.PERMISSION_GRANTED) {
-                      requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
-                  }
+                  web.setWebViewClient(new WebViewClient() {
+                      @Override
+                      public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
+                          return loader.shouldInterceptRequest(r.getUrl());
+                      }
+
+                      @Override
+                      public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
+                          Uri u = r.getUrl();
+                          if (HOST.equals(u.getHost())) return false;
+                          try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) {}
+                          return true;
+                      }
+                  });
+
+                  web.addJavascriptInterface(new Bridge(), "DahshanApp");
+                  web.loadUrl("https://" + HOST + "/assets/index.html");
               }
 
-              /* لا نستدعي web.onPause حتى يستمر الصوت خارج التطبيق */
+              void runJs(final String js) {
+                  if (web != null) web.post(() -> { if (web != null) web.evaluateJavascript(js, null); });
+              }
 
+              // زر الرجوع يُخفي التطبيق ولا يغلقه، فيبقى الراديو شغّالًا
               @Override
               public void onBackPressed() {
                   moveTaskToBack(true);
@@ -231,57 +190,39 @@ jobs:
 
               @Override
               protected void onDestroy() {
-                  if (current == this) current = null;
                   stopService(new Intent(this, RadioService.class));
-                  web.destroy();
+                  if (web != null) { web.destroy(); web = null; }
                   super.onDestroy();
               }
 
-              static void stopPlayback() {
-                  final MainActivity a = current;
-                  if (a == null) return;
-                  a.runOnUiThread(() -> a.web.evaluateJavascript("if(on)powerOff()", null));
-              }
-
-              static final class Bridge {
-                  private final Context context;
-
-                  Bridge(Context context) {
-                      this.context = context;
-                  }
-
+              public class Bridge {
                   @JavascriptInterface
-                  public void setPlaying(boolean playing, String name) {
-                      Intent intent = new Intent(context, RadioService.class);
-                      if (!playing) {
-                          context.stopService(intent);
-                          return;
-                      }
-                      RadioService service = RadioService.instance;
-                      if (service != null) {
-                          service.show(name);
-                          return;
-                      }
-                      intent.putExtra(RadioService.EXTRA_NAME, name);
-                      try {
-                          context.startForegroundService(intent);
-                      } catch (RuntimeException ignored) {
-                          // يستمر الصوت داخل التطبيق حتى لو رفض النظام تشغيل الخدمة
-                      }
+                  public void state(final boolean playing, final String title) {
+                      runOnUiThread(() -> {
+                          Intent i = new Intent(MainActivity.this, RadioService.class);
+                          try {
+                              if (playing) {
+                                  i.putExtra("title", title);
+                                  if (Build.VERSION.SDK_INT >= 26) startForegroundService(i);
+                                  else startService(i);
+                              } else {
+                                  stopService(i);
+                              }
+                          } catch (Exception ignored) {}
+                      });
                   }
               }
           }
-          FILE_END
+          EOF
 
-          cat > "$J/RadioService.java" <<'FILE_END'
-          package com.dahshan.radio;
+          cat > $J/RadioService.java <<'EOF'
+          package com.dahshansoft.radio;
 
           import android.app.Notification;
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
           import android.app.PendingIntent;
           import android.app.Service;
-          import android.content.Context;
           import android.content.Intent;
           import android.content.pm.ServiceInfo;
           import android.graphics.drawable.Icon;
@@ -291,99 +232,99 @@ jobs:
           import android.os.PowerManager;
 
           public class RadioService extends Service {
-              static final String EXTRA_NAME = "name";
-              private static final String ACTION_STOP = "com.dahshan.radio.STOP";
-              private static final String CHANNEL = "radio";
-              private static final int NOTIFICATION_ID = 1;
-
-              static volatile RadioService instance;
-
-              private PowerManager.WakeLock wakeLock;
-              private WifiManager.WifiLock wifiLock;
+              static final String CHANNEL = "radio_playback";
+              static final String ACTION_STOP = "com.dahshansoft.radio.STOP";
+              private PowerManager.WakeLock wake;
+              private WifiManager.WifiLock wifi;
 
               @Override
-              public void onCreate() {
-                  super.onCreate();
-                  NotificationChannel channel = new NotificationChannel(
-                          CHANNEL, "تشغيل الراديو", NotificationManager.IMPORTANCE_LOW);
-                  channel.setShowBadge(false);
-                  getSystemService(NotificationManager.class).createNotificationChannel(channel);
-
-                  PowerManager power = (PowerManager) getSystemService(Context.POWER_SERVICE);
-                  wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DahshanRadio:play");
-                  wakeLock.setReferenceCounted(false);
-                  wakeLock.acquire();
-
-                  WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-                  wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "DahshanRadio:play");
-                  wifiLock.setReferenceCounted(false);
-                  wifiLock.acquire();
-              }
+              public IBinder onBind(Intent intent) { return null; }
 
               @Override
               public int onStartCommand(Intent intent, int flags, int startId) {
-                  String name = intent == null ? null : intent.getStringExtra(EXTRA_NAME);
-                  Notification notification = build(name == null ? "محطة دهشان" : name);
-                  if (Build.VERSION.SDK_INT >= 29) {
-                      startForeground(NOTIFICATION_ID, notification,
-                              ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-                  } else {
-                      startForeground(NOTIFICATION_ID, notification);
-                  }
-                  instance = this;
                   if (intent != null && ACTION_STOP.equals(intent.getAction())) {
-                      MainActivity.stopPlayback();
+                      MainActivity a = MainActivity.instance.get();
+                      if (a != null) a.runJs("powerOff()");
                       stopSelf();
+                      return START_NOT_STICKY;
+                  }
+
+                  String title = intent != null ? intent.getStringExtra("title") : null;
+                  if (title == null || title.isEmpty()) title = "محطات إذاعية";
+
+                  NotificationManager nm = getSystemService(NotificationManager.class);
+                  if (Build.VERSION.SDK_INT >= 26) {
+                      NotificationChannel ch = new NotificationChannel(CHANNEL, "تشغيل الراديو", NotificationManager.IMPORTANCE_LOW);
+                      ch.setShowBadge(false);
+                      nm.createNotificationChannel(ch);
+                  }
+
+                  int pf = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+                  PendingIntent open = PendingIntent.getActivity(this, 0,
+                          new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), pf);
+                  PendingIntent stop = PendingIntent.getService(this, 1,
+                          new Intent(this, RadioService.class).setAction(ACTION_STOP), pf);
+
+                  Notification.Builder nb = Build.VERSION.SDK_INT >= 26
+                          ? new Notification.Builder(this, CHANNEL)
+                          : new Notification.Builder(this);
+                  nb.setSmallIcon(android.R.drawable.ic_media_play)
+                    .setContentTitle(title)
+                    .setContentText("على الهواء — محطات إذاعية")
+                    .setContentIntent(open)
+                    .setOngoing(true)
+                    .setShowWhen(false)
+                    .addAction(new Notification.Action.Builder((Icon) null, "إيقاف", stop).build());
+                  Notification n = nb.build();
+
+                  if (Build.VERSION.SDK_INT >= 29) startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                  else startForeground(1, n);
+
+                  if (wake == null) {
+                      PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                      wake = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "radio:playback");
+                      wake.setReferenceCounted(false);
+                      wake.acquire();
+                  }
+                  if (wifi == null) {
+                      WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
+                      if (wm != null) {
+                          wifi = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "radio:wifi");
+                          wifi.setReferenceCounted(false);
+                          wifi.acquire();
+                      }
                   }
                   return START_NOT_STICKY;
               }
 
-              void show(String name) {
-                  getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, build(name));
-              }
-
-              private Notification build(String name) {
-                  Intent open = new Intent(this, MainActivity.class)
-                          .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                  PendingIntent openPending = PendingIntent.getActivity(
-                          this, 0, open, PendingIntent.FLAG_IMMUTABLE);
-
-                  Intent stop = new Intent(this, RadioService.class).setAction(ACTION_STOP);
-                  PendingIntent stopPending = PendingIntent.getService(
-                          this, 1, stop, PendingIntent.FLAG_IMMUTABLE);
-
-                  return new Notification.Builder(this, CHANNEL)
-                          .setSmallIcon(R.drawable.ic_notify)
-                          .setContentTitle(name)
-                          .setContentText("على الهواء")
-                          .setContentIntent(openPending)
-                          .setOngoing(true)
-                          .addAction(new Notification.Action.Builder(
-                                  Icon.createWithResource(this, R.drawable.ic_notify),
-                                  "إيقاف", stopPending).build())
-                          .build();
-              }
-
               @Override
               public void onDestroy() {
-                  instance = null;
-                  if (wakeLock != null) wakeLock.release();
-                  if (wifiLock != null) wifiLock.release();
+                  if (wake != null && wake.isHeld()) wake.release();
+                  if (wifi != null && wifi.isHeld()) wifi.release();
+                  wake = null;
+                  wifi = null;
                   super.onDestroy();
               }
-
-              @Override
-              public IBinder onBind(Intent intent) {
-                  return null;
-              }
           }
-          FILE_END
+          EOF
 
       - name: Build APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+        working-directory: android
+        run: gradle assembleDebug --no-daemon
 
-      - uses: actions/upload-artifact@v4
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk mahattat-idhaiya.apk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: DahshanRadio
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          name: mahattat-idhaiya-apk
+          path: mahattat-idhaiya.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.${{ github.run_number }}
+          name: محطات إذاعية 1.${{ github.run_number }}
+          files: mahattat-idhaiya.apk
+          make_latest: true
