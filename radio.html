@@ -233,6 +233,7 @@ const KNOWN = [
 
 /* ========= أدوات مساعدة ========= */
 const $ = id => document.getElementById(id);
+const NATIVE = window.DahshanApp || null;   // موجود فقط داخل تطبيق الأندرويد
 const store = {
   get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
@@ -467,7 +468,10 @@ function tuneToDial(within, delay){
 /* ========= التشغيل ========= */
 function candidateUrls(st){
   const secure = location.protocol === 'https:';
-  const urls = secure ? st.urls.map(u => u.replace(/^http:/i, 'https:')) : st.urls;
+  // في تطبيق الأندرويد نجرّب https أولًا ثم الرابط الأصلي http، لأن التطبيق يسمح به
+  const urls = !secure ? st.urls : st.urls.flatMap(u => /^http:/i.test(u)
+    ? (NATIVE ? [u.replace(/^http:/i, 'https:'), u] : [u.replace(/^http:/i, 'https:')])
+    : [u]);
   return [...new Set(urls)];
 }
 
@@ -486,6 +490,7 @@ function play(st){
   attempt++;
   connect(attempt);
   updateMediaSession();
+  nativeState();
 }
 
 function connect(id){
@@ -712,6 +717,12 @@ function syncPower(){
   document.body.classList.toggle('on', on);
   $('powerIcon').setAttribute('d', on ? 'M6 6h12v12H6z' : 'M7 4v16l14-8z');
   $('powerBtn').setAttribute('aria-label', on ? 'إيقاف' : 'تشغيل');
+  nativeState();
+}
+/* يخبر تطبيق الأندرويد بحالة التشغيل ليُبقي البث شغّالًا في الخلفية مع إشعار */
+function nativeState(){
+  if (!NATIVE) return;
+  try { NATIVE.state(on, current ? current.name : ''); } catch {}
 }
 function syncFav(){
   const isFav = !!current && favs.has(current.id);
