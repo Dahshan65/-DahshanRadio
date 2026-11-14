@@ -4,15 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2a1a12">
-<title>محطة دهشان الإذاعية ترحب بكم</title>
-<meta name="description" content="استمع إلى الإذاعات الأردنية والعربية عبر الإنترنت">
+<title>محطات إذاعية</title>
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="محطة دهشان">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="محطات إذاعية">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;600;700&family=Reem+Kufi:wght@500;700&display=swap" rel="stylesheet">
@@ -135,6 +134,8 @@ body:not(.on) .panel{filter:brightness(.56) saturate(.72)}
 li.current .row-main b{color:var(--amber)}
 .notice{padding:22px 8px;text-align:center;color:var(--ivory-dim)}
 .notice button{display:inline-block;margin-top:10px;padding:8px 20px;border-radius:8px;background:var(--amber);color:var(--ink);font-weight:600}
+.credit{margin-top:26px;padding-top:14px;border-top:1px solid var(--wood-3);text-align:center;font-size:15px;color:var(--ivory-dim)}
+.credit a{color:var(--amber);text-decoration:none;font-family:"Reem Kufi",sans-serif;font-weight:500}
 @media (prefers-reduced-motion:reduce){.scale.snap,.panel{transition:none}}
 @media (max-width:430px){.grille{display:none}.brand{justify-content:center;text-align:center}}
 @media (max-width:370px){.freq{font-size:39px;min-width:92px}.controls{gap:12px}}
@@ -143,7 +144,7 @@ li.current .row-main b{color:var(--amber)}
 <body>
 <main class="app">
   <header class="brand">
-    <h1>محطة دهشان الإذاعية ترحب بكم</h1>
+    <h1>محطات إذاعية</h1>
     <div class="grille" aria-hidden="true"></div>
   </header>
 
@@ -185,9 +186,13 @@ li.current .row-main b{color:var(--amber)}
   <input class="search" id="search" type="search" placeholder="ابحث عن محطة" aria-label="ابحث عن محطة">
   <ul class="list" id="list"></ul>
   <div id="notice"></div>
+
+  <footer class="credit">
+    برمجة: <a href="https://dahshansoft.com" target="_blank" rel="noopener" dir="ltr">dahshansoft.com</a>
+  </footer>
 </main>
 
-<audio id="audio" preload="none"></audio>
+<audio id="audio" preload="none" playsinline></audio>
 
 <script>
 'use strict';
@@ -197,6 +202,9 @@ const PX = 96;                         // عدد البكسلات لكل ميغ�
 const HOSTS = ['de1', 'nl1', 'at1', 'de2'];
 const CONNECT_TIMEOUT = 13000;         // مهلة تجربة رابط البث
 const STATIC_VOLUME = 0.035;           // مستوى صوت التشويش بين المحطات
+const STALL_LIMIT = 15000;             // إذا توقف تقدّم الصوت هذه المدة يُعاد الاتصال
+const STALL_LIMIT_HIDDEN = 30000;      // المدة نفسها والشاشة مقفلة أو التطبيق في الخلفية
+const MAX_RETRIES = 40;                // أقصى عدد لمحاولات إعادة الاتصال المتتالية
 
 /* المحطات الأردنية وتردداتها في عمّان: الترتيب مهم، فالأدق يأتي أولًا */
 const KNOWN = [
@@ -250,6 +258,14 @@ let attempt = 0;          // يلغي محاولات الاتصال القديم
 let urlIndex = 0;
 let connectTimer = 0;
 let tuneTimer = 0;
+
+/* حالة إعادة الاتصال التلقائي */
+let playedOk = false;     // هل بدأ الرابط الحالي بالبث فعلًا
+let retries = 0;          // عدد محاولات إعادة الاتصال المتتالية
+let reconnectTimer = 0;
+let lastTime = -1;        // آخر موضع وصل إليه الصوت
+let lastTick = Date.now();// متى تقدّم الصوت آخر مرة
+let waitingReconnect = false; // هل ننتظر موعد إعادة الاتصال
 
 /* ========= تحميل المحطات ========= */
 async function api(path){
@@ -437,7 +453,6 @@ function tuneToDial(within, delay){
   if (!st){
     on = true; syncPower();
     stopStream();
-    notifyNative(false);
     current = null;
     highlightMark(); syncFav(); render();
     setNow('لا توجد محطة هنا', 'حرّك المؤشر نحو النقاط على التدريج');
@@ -466,6 +481,8 @@ function play(st){
   setNow(st.name, 'جارٍ الاتصال بالمحطة…');
   setStatic(true);
   urlIndex = 0;
+  retries = 0;
+  clearTimeout(reconnectTimer);
   attempt++;
   connect(attempt);
   updateMediaSession();
@@ -473,17 +490,29 @@ function play(st){
 
 function connect(id){
   if (id !== attempt || !current) return;
+  waitingReconnect = false;
   const urls = candidateUrls(current);
   if (urlIndex >= urls.length){
+    // أثناء إعادة الاتصال نعود لأول رابط ونحاول من جديد بدل الاستسلام
+    if (retries > 0 && retries < MAX_RETRIES){
+      urlIndex = 0;
+      reconnect();
+      return;
+    }
     stopStream();
     setStatic(false);
-    notifyNative(false);
-    setNow(current.name, 'هذه المحطة لا تبث الآن، فجرّب محطة أخرى');
+    setNow(current.name, retries > 0
+      ? 'تعذر إعادة الاتصال، اضغط الزر الأحمر للمحاولة'
+      : 'هذه المحطة لا تبث الآن، فجرّب محطة أخرى');
+    if (retries > 0){ on = false; syncPower(); }
     return;
   }
   clearTimeout(connectTimer);
   const index = urlIndex;
   connectTimer = setTimeout(() => failed(id, index), CONNECT_TIMEOUT);
+  playedOk = false;
+  lastTime = -1;
+  lastTick = Date.now();
   audio.src = urls[index];
   const p = audio.play();
   if (p) p.catch(err => {
@@ -506,26 +535,61 @@ function failed(id, index){
   connect(id);
 }
 
-/* يُبلغ تطبيق أندرويد ليبقي التشغيل مستمرًا والشاشة مطفأة */
-function notifyNative(playing, name){
-  try { if (window.AndroidRadio) window.AndroidRadio.setPlaying(playing, name || ''); } catch {}
-}
-
 function stopStream(){
   attempt++;
   clearTimeout(connectTimer);
   clearTimeout(tuneTimer);
+  clearTimeout(reconnectTimer);
+  waitingReconnect = false;
+  playedOk = false;
+  audio.removeAttribute('src');   // يُزال الرابط أولًا حتى لا يُفهم الإيقاف على أنه من النظام
   audio.pause();
-  audio.removeAttribute('src');
   audio.load();
 }
+
+/* إعادة الاتصال بنفس المحطة بعد انقطاع البث */
+function reconnect(){
+  if (!on || !current) return;
+  retries++;
+  if (retries > MAX_RETRIES){
+    retries = MAX_RETRIES;
+    urlIndex = candidateUrls(current).length; // يُظهر رسالة التعذّر
+    connect(attempt);
+    return;
+  }
+  // بعد محاولتين فاشلتين على نفس الرابط نجرّب الرابط التالي للمحطة
+  if (retries > 1 && retries % 2 === 1) urlIndex++;
+  attempt++;
+  const id = attempt;
+  clearTimeout(connectTimer);
+  clearTimeout(reconnectTimer);
+  playedOk = false;
+  waitingReconnect = true;
+  /* لا نوقف عنصر الصوت هنا: لو أوقفناه والشاشة مقفلة أو التطبيق في الخلفية
+     يمنع المتصفح تشغيله من جديد، فيسكت الراديو. نستبدل الرابط مباشرة في connect */
+  setNow(current.name, 'انقطع البث، جارٍ إعادة الاتصال…');
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+  const delay = Math.min(1000 * retries, 8000); // انتظار يتزايد تدريجيًا
+  reconnectTimer = setTimeout(() => connect(id), delay);
+}
+
+/* مراقب يفحص كل بضع ثوانٍ: هل الصوت يتقدّم فعلًا؟
+   نقرأ موضع الصوت مباشرة، لأن المتصفح يؤخّر أحداث الصوت في الخلفية،
+   فكان المراقب القديم يظن أن البث انقطع وهو شغّال، فيوقفه */
+setInterval(() => {
+  if (!on || !current || !playedOk || waitingReconnect) return;
+  const t = audio.currentTime;
+  if (t !== lastTime){ lastTime = t; lastTick = Date.now(); return; }
+  if (audio.paused) return;
+  const limit = document.hidden ? STALL_LIMIT_HIDDEN : STALL_LIMIT;
+  if (Date.now() - lastTick > limit) reconnect();
+}, 3000);
 
 function powerOff(){
   on = false;
   stopStream();
   setStatic(false);
   syncPower();
-  notifyNative(false);
   if (current) setNow(current.name, 'متوقف');
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 }
@@ -539,16 +603,55 @@ function togglePower(){
 
 audio.addEventListener('playing', () => {
   clearTimeout(connectTimer);
+  if (waitingReconnect){ clearTimeout(reconnectTimer); waitingReconnect = false; } // رجع البث وحده
+  playedOk = true;
+  retries = 0;
+  lastTick = Date.now();
   setStatic(false);
-  if (current){
-    setNow(current.name, 'على الهواء');
-    notifyNative(true, current.name);
-  }
+  if (current) setNow(current.name, 'على الهواء');
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 });
+audio.addEventListener('timeupdate', () => {
+  if (audio.currentTime !== lastTime){
+    lastTime = audio.currentTime;
+    lastTick = Date.now();
+  }
+});
 audio.addEventListener('waiting', () => { if (on && current) setNow(current.name, 'جارٍ التحميل…'); });
-audio.addEventListener('error', () => { if (on && audio.getAttribute('src')) failed(attempt, urlIndex); });
-audio.addEventListener('ended', () => { if (on && current) play(current); });
+audio.addEventListener('error', () => {
+  if (!on || !audio.getAttribute('src') || waitingReconnect) return;
+  // إذا كان الرابط يعمل ثم انقطع نعيد الاتصال، وإلا نجرّب الرابط التالي
+  if (playedOk) reconnect();
+  else failed(attempt, urlIndex);
+});
+audio.addEventListener('ended', () => { if (on && current && !waitingReconnect) reconnect(); });
+
+/* إذا أوقف النظام الصوت (مكالمة، فصل السماعة، تطبيق آخر شغّل صوتًا) نُظهر ذلك بدل أن نعاند */
+audio.addEventListener('pause', () => {
+  if (!on || !current || !playedOk || waitingReconnect || !audio.getAttribute('src')) return;
+  on = false;
+  playedOk = false;
+  clearTimeout(connectTimer);
+  clearTimeout(reconnectTimer);
+  syncPower();
+  setStatic(false);
+  setNow(current.name, 'توقف مؤقتًا، اضغط الزر الأحمر للمتابعة');
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+});
+
+/* عند رجوع الإنترنت أو الرجوع للتطبيق نتأكد أن البث شغّال */
+window.addEventListener('online', () => {
+  if (on && current && !waitingReconnect && Date.now() - lastTick > 3000){ retries = 0; reconnect(); }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !on || !current || waitingReconnect) return;
+  // نفحص هل الصوت يتقدّم فعلًا خلال ثانيتين، ولا نقطع بثًّا شغّالًا
+  const t0 = audio.currentTime;
+  setTimeout(() => {
+    if (!on || !current || waitingReconnect || !playedOk) return;
+    if (audio.paused || audio.currentTime === t0){ retries = 0; reconnect(); }
+  }, 2000);
+});
 
 function seek(dir){
   const list = visibleStations();
@@ -580,12 +683,25 @@ function ensureAudioContext(){
     staticGain.gain.value = 0;
     noise.connect(filter).connect(staticGain).connect(audioCtx.destination);
     noise.start();
+    setTimeout(() => { if (!staticOn && audioCtx) audioCtx.suspend().catch(() => {}); }, 400);
   } catch { audioCtx = null; staticGain = null; }
 }
+/* التشويش يعمل فقط والشاشة ظاهرة، ونطفئ محرّكه حين لا نحتاجه
+   حتى لا يزاحم صوت الإذاعة في الخلفية */
+let staticOn = false, suspendTimer = 0;
 function setStatic(active){
   if (!staticGain) return;
-  staticGain.gain.setTargetAtTime(active ? STATIC_VOLUME : 0, audioCtx.currentTime, .05);
+  staticOn = active && !document.hidden;
+  clearTimeout(suspendTimer);
+  if (staticOn && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  staticGain.gain.setTargetAtTime(staticOn ? STATIC_VOLUME : 0, audioCtx.currentTime, .05);
+  if (!staticOn){
+    suspendTimer = setTimeout(() => {
+      if (!staticOn && audioCtx && audioCtx.state === 'running') audioCtx.suspend().catch(() => {});
+    }, 400);
+  }
 }
+document.addEventListener('visibilitychange', () => { if (document.hidden) setStatic(false); });
 
 /* ========= الواجهة ========= */
 function setNow(name, status){
@@ -674,8 +790,14 @@ function updateMediaSession(){
   try {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: current.name,
-      artist: current.f ? `FM ${current.f.toFixed(1)}` : (current.country || 'راديو')
+      artist: current.f ? `FM ${current.f.toFixed(1)}` : (current.country || 'راديو'),
+      album: 'محطات إذاعية',
+      artwork: [
+        {src: 'icon-192.png', sizes: '192x192', type: 'image/png'},
+        {src: 'icon-512.png', sizes: '512x512', type: 'image/png'}
+      ]
     });
+    navigator.mediaSession.playbackState = on ? 'playing' : 'paused';
     navigator.mediaSession.setActionHandler('play', () => { if (!on) togglePower(); });
     navigator.mediaSession.setActionHandler('pause', () => { if (on) powerOff(); });
     navigator.mediaSession.setActionHandler('stop', () => { if (on) powerOff(); });

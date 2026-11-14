@@ -1,28 +1,17 @@
 {
-  "name": "محطة دهشان الإذاعية",
-  "short_name": "محطة دهشان",
-  "description": "استمع إلى الإذاعات الأردنية والعربية عبر الإنترنت",
+  "name": "محطات إذاعية",
+  "short_name": "محطات إذاعية",
+  "description": "راديو المحطات الأردنية والعربية عبر الإنترنت — برمجة: dahshansoft.com",
   "lang": "ar",
   "dir": "rtl",
-  "id": "./",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#2a1a12",
   "theme_color": "#2a1a12",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]
 }
